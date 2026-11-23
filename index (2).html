@@ -141,7 +141,7 @@ footer strong{color:var(--vw-basalt)}
   var CUR = [
     {c:'USD', n:'Amerikaanse dollar'},
     {c:'CAD', n:'Canadese dollar'},
-    {c:'INR', n:'Indiase roepie'},
+    {c:'IDR', n:'Indonesische roepia'},
     {c:'MYR', n:'Maleisische ringgit'},
     {c:'BRL', n:'Braziliaanse real'}
   ];
@@ -170,7 +170,9 @@ footer strong{color:var(--vw-basalt)}
     if (!nf[d]) nf[d] = new Intl.NumberFormat('nl-NL', {minimumFractionDigits:d, maximumFractionDigits:d});
     return nf[d].format(v);
   }
-  function rateDec(r) { return r < 10 ? 4 : 2; }
+  // Decimalen: kleine koersen 4, middelgrote 2, grote (zoals IDR) 0.
+  function rateDec(r) { return r < 10 ? 4 : r < 1000 ? 2 : 0; }
+  function amtDec(r) { return r < 1000 ? 2 : 0; }
   function time(d) { return d.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
   function refDay() { return st.refDate ? st.refDate.slice(8,10) + '-' + st.refDate.slice(5,7) : ''; }
   function has(o) { return Object.keys(o).length > 0; }
@@ -213,17 +215,20 @@ footer strong{color:var(--vw-basalt)}
     $('#reset').hidden = one;
     var useLive = st.mode === 'live' || st.mode === 'stale';
     var src = useLive ? st.live : st.ref;
-    list.classList.toggle('big', CUR.some(function (x) { return src[x.c] && fmt(src[x.c] * a, one ? rateDec(src[x.c]) : 2).length > 9; }));
+    list.classList.toggle('big', CUR.some(function (x) { return src[x.c] && fmt(src[x.c] * a, one ? rateDec(src[x.c]) : amtDec(src[x.c])).length > 9; }));
     CUR.forEach(function (x) {
       var r = src[x.c], el = rows[x.c];
       if (!r) { el.val.textContent = '–'; el.val.removeAttribute('data-copy'); el.inv.textContent = ''; el.ref.textContent = ''; el.dir.textContent = ''; return; }
-      var s = fmt(r * a, one ? rateDec(r) : 2);
+      var s = fmt(r * a, one ? rateDec(r) : amtDec(r));
       el.val.textContent = s;
       el.val.setAttribute('data-copy', s);
       el.val.classList.toggle('long', s.length > 9);
       el.dir.textContent = useLive ? (st.dir[x.c] > 0 ? '▲' : st.dir[x.c] < 0 ? '▼' : '') : '';
       var inv = 1 / r;
-      el.inv.textContent = (one ? '' : 'koers ' + fmt(r, rateDec(r)) + ' · ') + '1 ' + x.c + ' = € ' + fmt(inv, inv < 0.1 ? 5 : 4);
+      // Omgekeerde koers per 1, 10, 100 … eenheden, zodat er een leesbaar bedrag staat (bijv. 10.000 IDR = € 0,4982).
+      var unit = 1;
+      while (inv * unit < 0.1) unit *= 10;
+      el.inv.textContent = (one ? '' : 'koers ' + fmt(r, rateDec(r)) + ' · ') + fmt(unit, 0) + ' ' + x.c + ' = € ' + fmt(inv * unit, 4);
       el.ref.textContent = useLive && st.ref[x.c] ? st.refLabel + ' ' + refDay() + ': ' + fmt(st.ref[x.c], rateDec(st.ref[x.c])) : '';
     });
   }
